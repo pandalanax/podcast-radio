@@ -21,6 +21,10 @@ import adafruit_imageload
 import os
 from adafruit_progressbar.progressbar import HorizontalProgressBar
 
+#import alarm
+#import microcontroller
+
+
 # Setup the display
 displayio.release_displays()
 # Initialize I2C on GP0 (SDA), GP1 (SCL)
@@ -285,6 +289,11 @@ while True:
     # for every time we get out of the menu things have to be reset here.
     # Add a flag to track pause state
     paused = False
+    # At start of playback loop
+    start_time_reached = False
+    
+    if MP3_LENGTH:
+        estimated_duration = estimate_duration(MP3_LENGTH, bitrate_kbps=128)  # or use actual bitrate if known
 
     try:
         with requests.get(
@@ -305,9 +314,9 @@ while True:
                 progress_bar.value = 0
                 i2s.play(mp3_decoder)
 
-
-
                 while i2s.playing:
+                    actual_seconds_played = mp3_decoder.samples_decoded / (mp3_decoder.sample_rate * mp3_decoder.channel_count)
+                    print(round(actual_seconds_played))
                     current_b_confirm = b_confirm.value
                     if current_b_confirm != last_b_confirm_state and not current_b_confirm:
                         if not paused:
@@ -334,7 +343,26 @@ while True:
                         break
                     last_state = current_state
                     time.sleep(0.05)  # debounce
+                    
+                    """
+                    if actual_seconds_played >= 30 and not paused and not start_time_reached:
+                        print("30 seconds passed. Entering light sleep...")
+                        
+                        # Optional: Pause audio or display a message
+                        i2s.stop()
+                        response.socket.close()
+                        
+                        pin_alarm = alarm.pin.PinAlarm(pin=board.GP17, value=False, pull=True)
 
+                        print("Sleeping until button press or 30 seconds...")
+                        alarm.exit_and_deep_sleep_until_alarms(time_alarm, pin_alarm)                   
+                        # Reset flag
+                        start_time_reached = True
+                    """
+                    
+
+                    
+                    
             if poll:
                 poll.unregister(response.socket)
             if response.socket:
