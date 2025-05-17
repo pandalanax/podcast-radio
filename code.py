@@ -61,16 +61,16 @@ splash.append(text)
 #splash.append(text)
 display.root_group = splash
 
-# --- Setup button on GPIO18 ---
-b_display = digitalio.DigitalInOut(board.GP18)
-b_display.direction = digitalio.Direction.INPUT
-b_display.pull = digitalio.Pull.UP  # assumes button connects to GND when pressed
+# --- Setup b_confirm on GPIO18 ---
+b_cycle = digitalio.DigitalInOut(board.GP18)
+b_cycle.direction = digitalio.Direction.INPUT
+b_cycle.pull = digitalio.Pull.UP  # assumes b_confirm connects to GND when pressed
 
 # --- Button ---
-button = digitalio.DigitalInOut(board.GP17)
-button.direction = digitalio.Direction.INPUT
-button.pull = digitalio.Pull.UP
-last_button_state = button.value
+b_confirm = digitalio.DigitalInOut(board.GP17)
+b_confirm.direction = digitalio.Direction.INPUT
+b_confirm.pull = digitalio.Pull.UP
+last_b_confirm_state = b_confirm.value
 # --- Button ---
 b_menu = digitalio.DigitalInOut(board.GP19)
 b_menu.direction = digitalio.Direction.INPUT
@@ -118,9 +118,9 @@ def estimate_duration(file_size_bytes, bitrate_kbps=128):
 #current_index = 0
 #display.root_group = show_image(image_paths[current_index])
 
-# --- Main loop: cycle images on button press ---
-#last_state = b_display.value
-#last_confirm_state = button.value
+# --- Main loop: cycle images on b_confirm press ---
+#last_state = b_cycle.value
+#last_confirm_state = b_confirm.value
 
 
 
@@ -136,20 +136,20 @@ def menu():
     current_index = 0
     display.root_group = show_image(image_paths[current_index],"Menu")
 
-    # --- Main loop: cycle images on button press ---
-    last_state = b_display.value
-    last_confirm_state = button.value
+    # --- Main loop: cycle images on b_confirm press ---
+    last_state = b_cycle.value
+    last_confirm_state = b_confirm.value
     while True:
-        current_state = b_display.value
-        if not current_state and last_state:  # button just pressed
+        current_state = b_cycle.value
+        if not current_state and last_state:  # b_confirm just pressed
             current_index = (current_index + 1) % len(image_paths)
             print("Showing:", image_paths[current_index])
             display.root_group = show_image(image_paths[current_index],"Menu")
         last_state = current_state
         time.sleep(0.05)  # debounce
         
-        # Confirm button
-        current_confirm_state = button.value
+        # Confirm b_confirm
+        current_confirm_state = b_confirm.value
         if not current_confirm_state and last_confirm_state:
             # Get basename of current image
             img_name = image_paths[current_index]
@@ -275,17 +275,25 @@ STREAMING_URL,MP3_LENGTH = get_streaming_url_with_length(rss_feed)
 poll = None
 
 
-# Add a flag to track pause state
-paused = False
+
+
+
 
 # --- Playing Loop ---
 while True:
     print("\n Playing loop now!")
+    # for every time we get out of the menu things have to be reset here.
+    # Add a flag to track pause state
+    paused = False
 
     try:
         with requests.get(
             STREAMING_URL, headers={"connection": "close"}, stream=True
         ) as response:
+            label_layer = display.root_group[1] # assuming it's still the second element
+            progress_bar = display.root_group[2]
+            
+            
             if mp3_decoder is None:
                 mp3_decoder = audiomp3.MP3Decoder(response.socket, mp3_buffer)
             else:
@@ -293,34 +301,33 @@ while True:
 
             if socket_readable(response.socket):
                 print("playback...")
-                label_layer = display.root_group[1] # assuming it's still the second element
                 label_layer.text = "Playing"
-                i2s.play(mp3_decoder)
-                progress_bar = display.root_group[2]
                 progress_bar.value = 0
+                i2s.play(mp3_decoder)
+
 
 
                 while i2s.playing:
-                    current_button = button.value
-                    if current_button != last_button_state and not current_button:
+                    current_b_confirm = b_confirm.value
+                    if current_b_confirm != last_b_confirm_state and not current_b_confirm:
                         if not paused:
-                            print("\nButton pressed. Pausing playback.")
+                            print("\nPausing playback.")
                             label_layer.text = "Paused"
                             i2s.pause()
                             paused = True
                         else:
-                            print("\nButton pressed. Resuming playback.")
+                            print("\nResuming playback.")
                             label_layer.text = "Playing"
                             i2s.resume()
                             paused = False
-                    last_button_state = current_button
-                    time.sleep(0.1)
-                    progress_bar.value += 1/128
+                    last_b_confirm_state = current_b_confirm
+                    time.sleep(0.05)
+                    #progress_bar.value += 1/128
                     # refresh the display
-                    display.refresh()
+                    #display.refresh()
                     
                     current_state = b_menu.value
-                    if not current_state and last_state:  # button just pressed
+                    if not current_state and last_state:  # b_confirm just pressed
                         i2s.stop()
                         rss_feed = menu()
                         STREAMING_URL,MP3_LENGTH = get_streaming_url_with_length(rss_feed)
