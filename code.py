@@ -21,7 +21,7 @@ import adafruit_imageload
 import os
 from adafruit_progressbar.progressbar import HorizontalProgressBar
 
-#import alarm
+import alarm # needs PR 10023 on circuitpython
 #import microcontroller
 
 
@@ -86,7 +86,7 @@ rss_map = {
 }
 
 def show_image(path,state):
-    
+
     # Create a new progress_bar object at (x, y)
     progress_bar = HorizontalProgressBar(
         (x, y),
@@ -107,10 +107,10 @@ def show_image(path,state):
     group.append(text)
     group.append(progress_bar)
     return group
-    
+
 def estimate_duration(file_size_bytes, bitrate_kbps=128):
     return (file_size_bytes * 8) / (bitrate_kbps * 1000)
-    
+
 ## --- List BMP images in /sd ---
 #image_paths = [
 #    "/sd/" + f for f in os.listdir("/sd")
@@ -151,7 +151,7 @@ def menu():
             display.root_group = show_image(image_paths[current_index],"Menu")
         last_state = current_state
         time.sleep(0.05)  # debounce
-        
+
         # Confirm b_confirm
         current_confirm_state = b_confirm.value
         if not current_confirm_state and last_confirm_state:
@@ -291,7 +291,7 @@ while True:
     paused = False
     # At start of playback loop
     start_time_reached = False
-    
+
     if MP3_LENGTH:
         estimated_duration = estimate_duration(MP3_LENGTH, bitrate_kbps=128)  # or use actual bitrate if known
 
@@ -301,8 +301,8 @@ while True:
         ) as response:
             label_layer = display.root_group[1] # assuming it's still the second element
             progress_bar = display.root_group[2]
-            
-            
+
+
             if mp3_decoder is None:
                 mp3_decoder = audiomp3.MP3Decoder(response.socket, mp3_buffer)
             else:
@@ -334,7 +334,7 @@ while True:
                     #progress_bar.value += 1/128
                     # refresh the display
                     #display.refresh()
-                    
+
                     current_state = b_menu.value
                     if not current_state and last_state:  # b_confirm just pressed
                         i2s.stop()
@@ -343,26 +343,30 @@ while True:
                         break
                     last_state = current_state
                     time.sleep(0.05)  # debounce
+
                     
-                    """
-                    if actual_seconds_played >= 30 and not paused and not start_time_reached:
+                    if actual_seconds_played >= 15 and not paused and not start_time_reached:
                         print("30 seconds passed. Entering light sleep...")
-                        
+
                         # Optional: Pause audio or display a message
                         i2s.stop()
                         response.socket.close()
-                        
-                        pin_alarm = alarm.pin.PinAlarm(pin=board.GP17, value=False, pull=True)
+                        label_layer.text = "Sleep"
+                        time.sleep(1)
+                        # Setup the display
+                        displayio.release_displays()
+
+                        pin_alarm = alarm.pin.PinAlarm(pin=board.GP20, value=False, pull=True)
 
                         print("Sleeping until button press or 30 seconds...")
-                        alarm.exit_and_deep_sleep_until_alarms(time_alarm, pin_alarm)                   
+                        alarm.exit_and_deep_sleep_until_alarms(pin_alarm)
                         # Reset flag
                         start_time_reached = True
-                    """
                     
 
-                    
-                    
+
+
+
             if poll:
                 poll.unregister(response.socket)
             if response.socket:
